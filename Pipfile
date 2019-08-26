@@ -1,0 +1,19 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+
+[packages]
+fastapi = {extras = ["full"],version = "*"}
+uvicorn = "*"
+pydantic = "*"
+python-multipart = "*"
+pyjwt = "*"
+passlib = "*"
+motor = "*"
+redis = "*"
+
+[requires]
+python_version = "3.7"

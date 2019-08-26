@@ -1,0 +1,46 @@
+version: '3'
+services:
+  mongo:
+    image: mongo
+    expose:
+      - 27017
+    volumes:
+      - /data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: "${DB_USERNAME}"
+      MONGO_INITDB_ROOT_PASSWORD: "${DB_PASSWORD}"
+
+  mongo-express:
+    image: mongo-express
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: "${DB_USERNAME}"
+      ME_CONFIG_MONGODB_ADMINPASSWORD: "${DB_PASSWORD}"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    environment:
+      - DB_USERNAME
+      - DB_HOST=mongo
+      - DB_PASSWORD
+      - DB_NAME
+      - DB_PORT=27017
+      - SECRET_KEY
+      - ACCESS_TOKEN_EXPIRE_MINUTES
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      - mongo
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.107.0/24
