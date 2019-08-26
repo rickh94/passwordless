@@ -1,11 +1,13 @@
 import datetime
+import logging
 import os
 import secrets
 import string
 from typing import Union
 
 import jwt
-from fastapi import HTTPException, Security
+import redis
+from fastapi import HTTPException, Security, Depends
 from fastapi.openapi.models import OAuthFlows
 from fastapi.security import OAuth2
 from passlib.context import CryptContext
@@ -13,6 +15,8 @@ from starlette.requests import Request
 from starlette.status import HTTP_401_UNAUTHORIZED
 
 from app.auth import models, crud
+
+logger = logging.getLogger()
 
 
 class Passwordless(OAuth2):
@@ -39,7 +43,9 @@ class Passwordless(OAuth2):
 
     async def __call__(self, request: Request) -> str:
         """Extract token from cookies"""
+        logger.debug("getting token")
         token = request.cookies.get(self._token_name)
+        logger.debug(token)
         if not token:
             raise HTTPException(status_code=401, detail="Not Authorized")
         return token
@@ -55,22 +61,29 @@ def get_secret_key():
 
 SECRET_KEY = get_secret_key()
 ALGORITHM = "HS256"
-OTPS = {}
+OTPS = redis.Redis(host=os.getenv("REDIS_HOST"), port=os.getenv("REDIS_PORT"), db=0)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = Passwordless(tokenURL="/auth/confirm", authorizationUrl="/auth/request")
+oauth2_scheme = Passwordless(tokenUrl="/auth/confirm", authorizationUrl="/auth/request")
 
 
 def generate_otp(email: str) -> str:
     alphabet = string.ascii_letters + string.digits
-    code = "".join(secrets.choice(alphabet) for i in range(8))
+    code = "".join(secrets.choice(alphabet) for _ in range(8))
     code_hash = pwd_context.hash(code)
-    OTPS[email] = code_hash
+    OTPS.set(f"otp:{email}", code_hash)
+    OTPS.expire(f"otp:{email}", datetime.timedelta(minutes=5))
     return code
 
 
 def verify_otp(email: str, code: str) -> bool:
-    return pwd_context.verify(code, OTPS[email])
+    code_hash = OTPS.get(f"otp:{email}")
+    if not code_hash:
+        return False
+    success = pwd_context.verify(code, code_hash)
+    if success:
+        OTPS.expire(f"otp:{email}", datetime.timedelta(seconds=1))
+    return success
 
 
 async def authenticate_user(email: str, code: str) -> Union[models.UserInDB, bool]:
@@ -93,10 +106,28 @@ def create_access_token(*, data: dict, expires_delta: datetime.timedelta = None)
     return encoded_jwt
 
 
-async def get_current_user(token: str = Security(oauth2_scheme)):
+async def get_current_user(token: str = Security(oauth2_scheme)) -> models.UserInDB:
     credentials_exception = HTTPException(
         status_code=HTTP_401_UNAUTHORIZED, detail=f"Could not validate credentials"
     )
-    # try:
-    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    email: str = payload.get("sub")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        logger.debug(payload)
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except jwt.PyJWTError as err:
+        logger.debug(err)
+        raise credentials_exception
+    user = await crud.get_user_by_email(email)
+    if not user:
+        raise credentials_exception
+    return user
+
+
+async def get_current_active_user(
+    current_user: models.User = Depends(get_current_user)
+) -> models.User:
+    if current_user.disabled:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user

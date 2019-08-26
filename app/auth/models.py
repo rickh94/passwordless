@@ -7,7 +7,7 @@ class User(BaseModel):
     email: EmailStr = Schema(
         ..., title="Email", description="An email to be used for signing in."
     )
-    full_name: Optional[bool] = Schema(None, title="Full Name")
+    full_name: Optional[str] = Schema(None, title="Full Name")
     disabled: Optional[bool] = Schema(
         False,
         title="Disabled",
@@ -24,6 +24,7 @@ class UserInDB(User):
 
 
 class OTP(BaseModel):
+    email: EmailStr = Schema(..., title="Email")
     code: str = Schema(
         ..., title="One Time Password", description="Single use login code"
     )

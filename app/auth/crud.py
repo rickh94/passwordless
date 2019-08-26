@@ -1,7 +1,12 @@
+import logging
 from typing import Optional
+
+import bson
 
 from app.auth import models
 from app.dependencies import db
+
+logger = logging.getLogger()
 
 
 async def get_user_by_email(email: str) -> Optional[models.UserInDB]:
@@ -17,3 +22,7 @@ async def create_user(user: models.UserInDB) -> models.UserInDB:
     )
     created = await db.users.find_one({"_id": result.inserted_id})
     return models.UserInDB.parse_obj(created)
+
+
+async def get_user_by_id(user_id: str) -> models.UserInDB:
+    return await db.users.find_one({"_id": bson.ObjectId(user_id)})
