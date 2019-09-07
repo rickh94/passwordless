@@ -4,6 +4,7 @@ import os
 import secrets
 import string
 from typing import Union
+from urllib.parse import quote_plus
 
 import jwt
 import redis
@@ -62,6 +63,9 @@ def get_secret_key():
 SECRET_KEY = get_secret_key()
 ALGORITHM = "HS256"
 OTPS = redis.Redis(host=os.getenv("REDIS_HOST"), port=os.getenv("REDIS_PORT"), db=0)
+URL_SECRETS = redis.Redis(
+    host=os.getenv("REDIS_HOST"), port=os.getenv("REDIS_PORT"), db=1
+)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = Passwordless(tokenUrl="/auth/confirm", authorizationUrl="/auth/request")
@@ -74,6 +78,25 @@ def generate_otp(email: str) -> str:
     OTPS.set(f"otp:{email}", code_hash)
     OTPS.expire(f"otp:{email}", datetime.timedelta(minutes=5))
     return code
+
+
+def generate_magic_link(email: str) -> str:
+    url_secret = secrets.token_urlsafe()
+    secret_hash = pwd_context.hash(url_secret)
+    URL_SECRETS.set(f"url_secret:{email}", secret_hash)
+    URL_SECRETS.expire(f"url_secret:{email}", datetime.timedelta(minutes=5))
+    host = os.getenv("HOSTNAME", "localhost")
+    return f"{host}/auth/magic?secret={url_secret}&email={quote_plus(email)}"
+
+
+def verify_magic_link(email: str, secret: str):
+    secret_hash = URL_SECRETS.get(f"url_secret:{email}")
+    if not secret_hash:
+        return False
+    success = pwd_context.verify(secret, secret_hash)
+    if success:
+        URL_SECRETS.expire(f"url_secret:{email}", datetime.timedelta(seconds=1))
+    return success
 
 
 def verify_otp(email: str, code: str) -> bool:
@@ -91,6 +114,15 @@ async def authenticate_user(email: str, code: str) -> Union[models.UserInDB, boo
     if not user:
         return False
     if not verify_otp(email, code):
+        return False
+    return user
+
+
+async def authenticate_user_magic(email: str, secret: str):
+    user = await crud.get_user_by_email(email)
+    if not user:
+        return False
+    if not verify_magic_link(email, secret):
         return False
     return user
 

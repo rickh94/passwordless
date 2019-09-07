@@ -35,6 +35,11 @@ services:
       - MAILGUN_KEY
       - REDIS_HOST=redis_cache
       - REDIS_PORT=6379
+      - HOSTNAME
+      - MAILGUN_ENDPOINT
+      - MAILGUN_FROM_NAME
+      - MAILGUN_FROM_ADDRESS
+      - DEBUG=1
     volumes:
       - ./app:/app/app
     depends_on:

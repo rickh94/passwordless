@@ -1,0 +1,8 @@
+.pre-commit-config.yaml
+.eslintrc.js
+.babelrc
+.browserslistrc
+*.scss
+package.json
+index.html
+service-worker.js
