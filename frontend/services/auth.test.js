@@ -1,17 +1,17 @@
 import { expect, assert } from '@open-wc/testing'
 import { fetchMock } from '@bundled-es-modules/fetch-mock'
-import { Auth } from './auth'
+import { Auth, linkResults } from './auth'
 import { url } from '../config'
 
 describe('Auth service', function() {
   afterEach(function() {
     fetchMock.restore()
   })
-  describe('requestLogin', function() {
+  describe('requestLoginCode', function() {
     it('can request login code', async function() {
       const auth = new Auth()
       fetchMock.postOnce(`${url}/auth/request`, 200)
-      const result = await auth.requestLogin('test@example.com')
+      const result = await auth.requestLoginCode('test@example.com')
       expect(fetchMock.lastCall()[0]).to.equal(`${url}/auth/request`)
       expect(fetchMock.lastCall()[1].body).to.equal(
         JSON.stringify({ email: 'test@example.com' })
@@ -23,7 +23,7 @@ describe('Auth service', function() {
     it('returns false if get code fails', async function() {
       const auth = new Auth()
       fetchMock.postOnce(`${url}/auth/request`, 400)
-      const result = await auth.requestLogin('fail@example.com')
+      const result = await auth.requestLoginCode('fail@example.com')
       expect(fetchMock.lastCall()[0]).to.equal(`${url}/auth/request`)
       expect(fetchMock.lastCall()[1].body).to.equal(
         JSON.stringify({ email: 'fail@example.com' })
@@ -35,7 +35,43 @@ describe('Auth service', function() {
     it('returns false if get code fails with error', async function() {
       const auth = new Auth()
       fetchMock.mock('*', { throws: new Error('Network Error') })
-      const result = await auth.requestLogin('fail@example.com')
+      const result = await auth.requestLoginCode('fail@example.com')
+      expect(result).to.be.false
+      expect(auth.email).to.equal('')
+    })
+  })
+
+  describe('requestLoginLink', function() {
+    it('can request login link', async function() {
+      const auth = new Auth()
+      fetchMock.postOnce(`${url}/auth/request-magic`, 200)
+      const result = await auth.requestLoginLink('test@example.com')
+      expect(fetchMock.lastCall()[0]).to.equal(`${url}/auth/request-magic`)
+      expect(fetchMock.lastCall()[1].body).to.equal(
+        JSON.stringify({ email: 'test@example.com' })
+      )
+      expect(result).to.be.true
+      expect(auth.email).to.equal('test@example.com')
+      const savedEmail = localStorage.getItem('savedEmail')
+      expect(savedEmail).to.equal('test@example.com')
+    })
+
+    it('returns false if get link fails', async function() {
+      const auth = new Auth()
+      fetchMock.postOnce(`${url}/auth/request-magic`, 400)
+      const result = await auth.requestLoginLink('fail@example.com')
+      expect(fetchMock.lastCall()[0]).to.equal(`${url}/auth/request-magic`)
+      expect(fetchMock.lastCall()[1].body).to.equal(
+        JSON.stringify({ email: 'fail@example.com' })
+      )
+      expect(result).to.be.false
+      expect(auth.email).to.equal('')
+    })
+
+    it('returns false if get code fails with error', async function() {
+      const auth = new Auth()
+      fetchMock.mock('*', { throws: new Error('Network Error') })
+      const result = await auth.requestLoginLink('fail@example.com')
       expect(result).to.be.false
       expect(auth.email).to.equal('')
     })
@@ -46,7 +82,7 @@ describe('Auth service', function() {
       const auth = new Auth()
       fetchMock.postOnce(`${url}/auth/request`, 200)
       fetchMock.postOnce(`${url}/auth/confirm`, 200, { status: 'authenticated' })
-      await auth.requestLogin('test@example.com')
+      await auth.requestLoginCode('test@example.com')
       const result = await auth.confirmLogin('123456')
       expect(result).to.be.true
       expect(auth._isAuthenticated).to.be.true
@@ -62,7 +98,7 @@ describe('Auth service', function() {
       fetchMock.postOnce(`${url}/auth/confirm`, 400, {
         detail: 'invalid email or code',
       })
-      await auth.requestLogin('fail@example.com')
+      await auth.requestLoginCode('fail@example.com')
       const result = await auth.confirmLogin('123456')
       expect(result).to.be.false
       expect(auth._isAuthenticated).to.be.false
@@ -78,6 +114,67 @@ describe('Auth service', function() {
       fetchMock.mock('*', { throws: new Error('Network Error') })
       const result = await auth.confirmLogin('123456')
       expect(result).to.be.false
+      expect(auth._isAuthenticated).to.be.false
+    })
+  })
+
+  describe('confirmLoginLink', function() {
+    it('returns loggedIn if login secret is correct', async function() {
+      const auth = new Auth()
+      fetchMock.postOnce(`${url}/auth/request-magic`, 200)
+      fetchMock.postOnce(`${url}/auth/confirm-magic`, 200, { status: 'authenticated' })
+      await auth.requestLoginLink('test@example.com')
+      window.history.pushState({}, 'Magic', '/?secret=1234')
+      const result = await auth.confirmLoginLink()
+      // window.location.search = '?secret=1234'
+      expect(result).to.equal(linkResults.loggedIn)
+      expect(auth._isAuthenticated).to.be.true
+      expect(fetchMock.lastCall()[0]).to.equal(`${url}/auth/confirm-magic`)
+      expect(fetchMock.lastCall()[1].body).to.equal(
+        JSON.stringify({ email: 'test@example.com', secret: '1234' })
+      )
+    })
+
+    it('returns failure if login secret is incorrect', async function() {
+      const auth = new Auth()
+      fetchMock.postOnce(`${url}/auth/request-magic`, 200)
+      fetchMock.postOnce(`${url}/auth/confirm-magic`, 400, {
+        detail: 'invalid email or secret',
+      })
+      await auth.requestLoginLink('fail@example.com')
+      window.history.pushState({}, 'Magic', '/?secret=1234')
+      const result = await auth.confirmLoginLink()
+      expect(result).to.equal(linkResults.loginFailed)
+      expect(auth._isAuthenticated).to.be.false
+      expect(fetchMock.lastCall()[0]).to.equal(`${url}/auth/confirm-magic`)
+      expect(fetchMock.lastCall()[1].body).to.equal(
+        JSON.stringify({ email: 'fail@example.com', secret: '1234' })
+      )
+    })
+
+    it('returns failure if confirmLogin fails with an error', async function() {
+      const auth = new Auth()
+      fetchMock.mock('*', { throws: new Error('Network Error') })
+      window.history.pushState({}, 'Magic', '/?secret=1234')
+      const result = await auth.confirmLoginLink('test@example.com')
+      expect(result).to.equal(linkResults.loginFailed)
+      expect(auth._isAuthenticated).to.be.false
+    })
+
+    it('returns missingEmail if no email is provided', async function() {
+      const auth = new Auth()
+      window.history.pushState({}, 'Magic', '/?secret=1234')
+      localStorage.removeItem('savedEmail')
+      const result = await auth.confirmLoginLink()
+      expect(result).to.equal(linkResults.missingEmail)
+      expect(auth._isAuthenticated).to.be.false
+    })
+
+    it('returns no secret if secret is not in querystring', async function() {
+      const auth = new Auth()
+      window.history.pushState({}, 'Magic', '/')
+      const result = await auth.confirmLoginLink('test@example.com')
+      expect(result).to.equal(linkResults.noSecret)
       expect(auth._isAuthenticated).to.be.false
     })
   })

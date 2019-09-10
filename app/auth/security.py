@@ -86,7 +86,7 @@ def generate_magic_link(email: str) -> str:
     URL_SECRETS.set(f"url_secret:{email}", secret_hash)
     URL_SECRETS.expire(f"url_secret:{email}", datetime.timedelta(minutes=5))
     host = os.getenv("HOSTNAME", "localhost")
-    return f"{host}/auth/magic?secret={url_secret}&email={quote_plus(email)}"
+    return f"{host}?secret={url_secret}"
 
 
 def verify_magic_link(email: str, secret: str):

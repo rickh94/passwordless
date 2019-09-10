@@ -1,12 +1,13 @@
 import { html, css, LitElement } from 'lit-element'
 import '@material/mwc-button'
 import '@material/mwc-textfield'
-import auth from '../../../services/auth'
+import auth, { linkResults } from '../../../services/auth'
 
 export const modes = {
   email: Symbol('email'),
   code: Symbol('code'),
   register: Symbol('register'),
+  getEmailForLink: Symbol('getEmailForLink'),
 }
 
 export class LoginForm extends LitElement {
@@ -53,6 +54,24 @@ export class LoginForm extends LitElement {
     }
   }
 
+  async firstUpdated() {
+    const result = await auth.confirmLoginLink()
+    switch (result) {
+      case linkResults.loggedIn:
+        this.dispatchEvent(new CustomEvent('loginSuccessful'))
+        break
+      case linkResults.missingEmail:
+        this._setMode(modes.getEmailForLink)
+        break
+      case linkResults.loginFailed:
+        alert('Invalid Link')
+        break
+      case linkResults.noSecret:
+      default:
+        return
+    }
+  }
+
   constructor() {
     super()
     this.title = 'Login'
@@ -65,6 +84,8 @@ export class LoginForm extends LitElement {
         return this._submitCodeMode()
       case modes.register:
         return this._registerMode()
+      case modes.getEmailForLink:
+        return this._getEmailForLinkMode()
       case modes.email:
       default:
         return this._getEmailMode()
@@ -92,9 +113,23 @@ export class LoginForm extends LitElement {
       return
     }
     const email = $emailInput.value
-    const success = await auth.requestLogin(email)
+    const success = await auth.requestLoginCode(email)
     if (success) {
       this._setMode(modes.code)
+    } else {
+      this._setError('Could not log in with this email')
+    }
+  }
+
+  async _getMagicLink() {
+    const $emailInput = this.shadowRoot.getElementById('email')
+    if (!$emailInput.validity) {
+      return
+    }
+    const email = $emailInput.value
+    const success = await auth.requestLoginLink(email)
+    if (success) {
+      alert('Email Sent')
     } else {
       this._setError('Could not log in with this email')
     }
@@ -104,7 +139,7 @@ export class LoginForm extends LitElement {
     const email = this.shadowRoot.getElementById('register-email').value
     const success = await auth.register(email)
     if (success) {
-      const loginSuccess = await auth.requestLogin(email)
+      const loginSuccess = await auth.requestLoginCode(email)
       if (loginSuccess) {
         this._setMode(modes.code)
       } else {
@@ -117,6 +152,9 @@ export class LoginForm extends LitElement {
 
   async _submitCode() {
     const code = this.shadowRoot.getElementById('code').value
+    if (!code) {
+      this._setError('Please enter a code.')
+    }
     const success = await auth.confirmLogin(code)
     if (success) {
       console.log('logged in')
@@ -126,9 +164,35 @@ export class LoginForm extends LitElement {
     }
   }
 
+  async _confirmLoginLink() {
+    const email = this.shadowRoot.getElementById('confirm-email').value
+    if (!email) {
+      this._setError('Email is required')
+      return
+    }
+    const success = await auth.confirmLoginLink(email)
+    switch (success) {
+      case linkResults.loggedIn:
+        this.dispatchEvent(new CustomEvent('loginSuccessful'))
+        break
+      case linkResults.loginFailed:
+        this.dispatchEvent(new CustomEvent('loginFailed'))
+        this._setError('Login Failed')
+        break
+      case linkResults.missingEmail:
+        this._setError('Email is required')
+        break
+      case linkResults.noSecret:
+        this._setError('Link is invalid')
+        break
+      default:
+        this._setError('Something has gone wrong')
+    }
+  }
+
   _getEmailMode() {
     return html`
-      <p>Enter your email to obtain a login code.</p>
+      <p>Enter your email to obtain a login code or magic login link.</p>
       <mwc-textfield outlined type="email" label="Email" id="email"></mwc-textfield>
       <mwc-button
         outlined
@@ -136,8 +200,30 @@ export class LoginForm extends LitElement {
         @click=${this._getLoginCode}
       ></mwc-button>
       <mwc-button
+        outlined
+        label="Get Login Link"
+        @click=${this._getMagicLink}
+      ></mwc-button>
+      <mwc-button
         label="Register"
         @click=${() => this._setMode(modes.register)}
+      ></mwc-button>
+    `
+  }
+
+  _getEmailForLinkMode() {
+    return html`
+      <p>Please enter your email to confirm login.</p>
+      <mwc-textfield
+        outlined
+        type="email"
+        label="Email"
+        id="confirm-email"
+      ></mwc-textfield>
+      <mwc-button
+        outlined
+        label="Confirm Login"
+        @click=${this._confirmLoginLink}
       ></mwc-button>
     `
   }

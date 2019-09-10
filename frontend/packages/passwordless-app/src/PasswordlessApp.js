@@ -12,7 +12,7 @@ export class PasswordlessApp extends LitElement {
 
   constructor() {
     super()
-    this.page = 'main'
+    this.page = 'login'
   }
 
   static get styles() {
@@ -23,9 +23,26 @@ export class PasswordlessApp extends LitElement {
     `
   }
 
+  _onLoginSuccessful() {
+    console.log('logged in')
+    this.page = 'main'
+    this.requestUpdate()
+  }
+
   render() {
-    return html`
-    <login-form title="Passwordless Login"></login-form>
-    `
+    switch (this.page) {
+      case 'main':
+        return html`
+          <div>Successfully logged in</div>
+        `
+      case 'login':
+      default:
+        return html`
+          <login-form
+            title="Passwordless Login"
+            @loginSuccessful=${this._onLoginSuccessful}
+          ></login-form>
+        `
+    }
   }
 }

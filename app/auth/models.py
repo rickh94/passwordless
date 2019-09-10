@@ -30,5 +30,10 @@ class OTP(BaseModel):
     )
 
 
+class Magic(BaseModel):
+    email: EmailStr = Schema(..., title="Email")
+    secret: str = Schema(..., title="Secret from magic link url.")
+
+
 class AuthRequest(BaseModel):
     email: EmailStr = Schema(..., title="Email", description="Email of registered user")

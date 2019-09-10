@@ -10,13 +10,20 @@ function sendData(endpoint, data) {
   })
 }
 
+export const linkResults = {
+  loggedIn: Symbol('loggedIn'),
+  missingEmail: Symbol('missingEmail'),
+  noSecret: Symbol('noSecret'),
+  loginFailed: Symbol('loginFailed'),
+}
+
 export class Auth {
   constructor() {
     this.email = ''
     this._isAuthenticated = false
   }
 
-  async requestLogin(email) {
+  async requestLoginCode(email) {
     try {
       const response = await sendData(`${url}/auth/request`, {
         email,
@@ -29,6 +36,47 @@ export class Auth {
       }
     } catch (err) {
       return false
+    }
+  }
+
+  async requestLoginLink(email) {
+    try {
+      const response = await sendData(`${url}/auth/request-magic`, { email })
+      if (response.status === 200) {
+        this.email = email
+        localStorage.setItem('savedEmail', email)
+        return true
+      } else {
+        return false
+      }
+    } catch (err) {
+      return false
+    }
+  }
+
+  async confirmLoginLink(email = null) {
+    const urlParams = new URLSearchParams(window.location.search)
+    const secret = urlParams.get('secret')
+    if (!secret) {
+      return linkResults.noSecret
+    }
+    email = email || localStorage.getItem('savedEmail')
+    if (!email) {
+      return linkResults.missingEmail
+    }
+    try {
+      const response = await sendData(`${url}/auth/confirm-magic`, {
+        email, secret
+      })
+      if (response.status === 200) {
+        this._isAuthenticated = true
+        return linkResults.loggedIn
+      } else {
+        this._isAuthenticated = false
+        return linkResults.loginFailed
+      }
+    } catch (err) {
+      return linkResults.loginFailed
     }
   }
 

@@ -3,7 +3,7 @@ import logging
 import os
 
 import aiohttp
-from fastapi import APIRouter, Depends, Body, HTTPException
+from fastapi import APIRouter, Depends, Body, HTTPException, Form
 from starlette.responses import UJSONResponse
 from starlette.status import (
     HTTP_401_UNAUTHORIZED,
@@ -75,8 +75,24 @@ async def request_magic(data: models.AuthRequest = Body(...)):
     return "Please check your email for your sign in link."
 
 
+@auth_router.post("/confirm-magic")
+async def verify_magic(data: models.Magic = Body(...)):
+    user = await security.authenticate_user_magic(data.email, data.secret)
+    if not user:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Invalid Link")
+    access_token_expires = datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = security.create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    response = UJSONResponse({"status": "authenticated"})
+    response.set_cookie(
+        oauth2_scheme.token_name, access_token, httponly=True, secure=secure_cookies
+    )
+    return response
+
+
 @auth_router.get("/magic")
-async def magic(secret: str, email: str):
+async def magic(secret: str, email: str = Form(...)):
     user = await security.authenticate_user_magic(email, secret)
     if not user:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Invalid Link")
