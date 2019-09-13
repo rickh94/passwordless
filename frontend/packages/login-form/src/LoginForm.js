@@ -195,16 +195,19 @@ export class LoginForm extends LitElement {
       <p>Enter your email to obtain a login code or magic login link.</p>
       <mwc-textfield outlined type="email" label="Email" id="email"></mwc-textfield>
       <mwc-button
+        id="get-code-button"
         outlined
         label="Get Login Code"
         @click=${this._getLoginCode}
       ></mwc-button>
       <mwc-button
+        id="get-link-button"
         outlined
         label="Get Login Link"
         @click=${this._getMagicLink}
       ></mwc-button>
       <mwc-button
+      id="register-button"
         label="Register"
         @click=${() => this._setMode(modes.register)}
       ></mwc-button>
@@ -249,8 +252,8 @@ export class LoginForm extends LitElement {
         label="Email"
         id="register-email"
       ></mwc-textfield>
-      <mwc-button outlined label="Register" @click=${this._register}></mwc-button>
-      <mwc-button label="Login" @click=${() => this._setMode(modes.email)}></mwc-button>
+      <mwc-button outlined label="Register" @click=${this._register} id="register-submit"></mwc-button>
+      <mwc-button label="Login" @click=${() => this._setMode(modes.email)} id="login-mode-button"></mwc-button>
     `
   }
 
