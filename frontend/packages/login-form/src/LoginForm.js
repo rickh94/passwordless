@@ -109,7 +109,7 @@ export class LoginForm extends LitElement {
 
   async _getLoginCode() {
     const $emailInput = this.shadowRoot.getElementById('email')
-    if (!$emailInput.validity) {
+    if (!$emailInput.validity.valid) {
       return
     }
     const email = $emailInput.value
@@ -123,7 +123,7 @@ export class LoginForm extends LitElement {
 
   async _getMagicLink() {
     const $emailInput = this.shadowRoot.getElementById('email')
-    if (!$emailInput.validity) {
+    if (!$emailInput.validity.valid) {
       return
     }
     const email = $emailInput.value
@@ -154,10 +154,10 @@ export class LoginForm extends LitElement {
     const code = this.shadowRoot.getElementById('code').value
     if (!code) {
       this._setError('Please enter a code.')
+      return
     }
     const success = await auth.confirmLogin(code)
     if (success) {
-      console.log('logged in')
       this.dispatchEvent(new CustomEvent('loginSuccessful'))
     } else {
       this.dispatchEvent(new CustomEvent('loginFailed'))
@@ -237,6 +237,7 @@ export class LoginForm extends LitElement {
       <mwc-textfield outlined type="text" label="Login Code" id="code"></mwc-textfield>
       <mwc-button
         outlined
+        id='submit-code-button'
         label="Submit Login Code"
         @click=${this._submitCode}
       ></mwc-button>
