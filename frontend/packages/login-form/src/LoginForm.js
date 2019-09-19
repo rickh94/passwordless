@@ -207,7 +207,7 @@ export class LoginForm extends LitElement {
         @click=${this._getMagicLink}
       ></mwc-button>
       <mwc-button
-      id="register-button"
+        id="register-button"
         label="Register"
         @click=${() => this._setMode(modes.register)}
       ></mwc-button>
@@ -224,6 +224,7 @@ export class LoginForm extends LitElement {
         id="confirm-email"
       ></mwc-textfield>
       <mwc-button
+        id="confirm-email-button"
         outlined
         label="Confirm Login"
         @click=${this._confirmLoginLink}
@@ -237,7 +238,7 @@ export class LoginForm extends LitElement {
       <mwc-textfield outlined type="text" label="Login Code" id="code"></mwc-textfield>
       <mwc-button
         outlined
-        id='submit-code-button'
+        id="submit-code-button"
         label="Submit Login Code"
         @click=${this._submitCode}
       ></mwc-button>
@@ -253,8 +254,17 @@ export class LoginForm extends LitElement {
         label="Email"
         id="register-email"
       ></mwc-textfield>
-      <mwc-button outlined label="Register" @click=${this._register} id="register-submit"></mwc-button>
-      <mwc-button label="Login" @click=${() => this._setMode(modes.email)} id="login-mode-button"></mwc-button>
+      <mwc-button
+        outlined
+        label="Register"
+        @click=${this._register}
+        id="register-submit"
+      ></mwc-button>
+      <mwc-button
+        label="Login"
+        @click=${() => this._setMode(modes.email)}
+        id="login-mode-button"
+      ></mwc-button>
     `
   }
 

@@ -4,7 +4,7 @@ import sinon from 'sinon'
 
 import '../login-form.js'
 import { modes } from '../src/LoginForm'
-import auth from '../../../services/auth'
+import auth, { linkResults } from '../../../services/auth'
 
 /**
  * @typedef {import('../src/LoginForm')}
@@ -258,21 +258,21 @@ describe('LoginForm', function() {
     })
   })
 
-  describe('submitCodeMode', function () {
+  describe('submitCodeMode', function() {
     let requestLoginCode
     let confirmLogin
-    beforeEach(function () {
+    beforeEach(function() {
       requestLoginCode = sinon.stub(auth, 'requestLoginCode')
       requestLoginCode.resolves(true)
       confirmLogin = sinon.stub(auth, 'confirmLogin')
     })
 
-    afterEach(function () {
+    afterEach(function() {
       requestLoginCode.restore()
       confirmLogin.restore()
     })
 
-    it('switches to submitCodeMode', async function () {
+    it('switches to submitCodeMode', async function() {
       const el = /** @type {LoginForm} */ await fixture(
         html`
           <login-form title="Login to Test"></login-form>
@@ -284,13 +284,16 @@ describe('LoginForm', function() {
       expect(el.shadowRoot.querySelectorAll('#code').length).to.equal(1)
     })
 
-    it('submits the code', async function () {
+    it('submits the code', async function() {
       let loggedIn = false
-      const setLoggedIn = () => loggedIn = true
+      const setLoggedIn = () => (loggedIn = true)
       confirmLogin.resolves(true)
       const el = /** @type {LoginForm} */ await fixture(
         html`
-          <login-form title="Login to Test" @loginSuccessful=${setLoggedIn}></login-form>
+          <login-form
+            title="Login to Test"
+            @loginSuccessful=${setLoggedIn}
+          ></login-form>
         `
       )
       el.shadowRoot.getElementById('email').value = 'test@example.com'
@@ -303,13 +306,16 @@ describe('LoginForm', function() {
       expect(confirmLogin.called).to.be.true
     })
 
-    it('does not submit without code', async function () {
+    it('does not submit without code', async function() {
       let loggedIn = false
-      const setLoggedIn = () => loggedIn = true
+      const setLoggedIn = () => (loggedIn = true)
       confirmLogin.resolves(true)
       const el = /** @type {LoginForm} */ await fixture(
         html`
-          <login-form title="Login to Test" @loginSuccessful=${setLoggedIn}></login-form>
+          <login-form
+            title="Login to Test"
+            @loginSuccessful=${setLoggedIn}
+          ></login-form>
         `
       )
       el.shadowRoot.getElementById('email').value = 'test@example.com'
@@ -319,18 +325,26 @@ describe('LoginForm', function() {
       await elementUpdated(el)
       expect(loggedIn).to.be.false
       expect(confirmLogin.called).to.be.false
-      expect(el.shadowRoot.getElementById('error-message').style.display).to.equal('block')
-      expect(el.shadowRoot.getElementById('error-message').textContent).to.equal('Please enter a code.')
+      expect(el.shadowRoot.getElementById('error-message').style.display).to.equal(
+        'block'
+      )
+      expect(el.shadowRoot.getElementById('error-message').textContent).to.equal(
+        'Please enter a code.'
+      )
     })
 
-    it('emits loginFailed if login is not verified', async function () {
+    it('emits loginFailed if login is not verified', async function() {
       let loginSuccessful
-      const setLoggedIn = () => loginSuccessful = true
-      const setNotLoggedIn = () => loginSuccessful = false
+      const setLoggedIn = () => (loginSuccessful = true)
+      const setNotLoggedIn = () => (loginSuccessful = false)
       confirmLogin.resolves(false)
       const el = /** @type {LoginForm} */ await fixture(
         html`
-          <login-form title="Login to Test" @loginSuccessful=${setLoggedIn} @loginFailed=${setNotLoggedIn}></login-form>
+          <login-form
+            title="Login to Test"
+            @loginSuccessful=${setLoggedIn}
+            @loginFailed=${setNotLoggedIn}
+          ></login-form>
         `
       )
       el.shadowRoot.getElementById('email').value = 'test@example.com'
@@ -345,6 +359,235 @@ describe('LoginForm', function() {
     })
   })
 
+  describe('first updated with link', function() {
+    let confirmLoginLink
+    beforeEach(function() {
+      confirmLoginLink = sinon.stub(auth, 'confirmLoginLink')
+    })
+
+    afterEach(function() {
+      confirmLoginLink.restore()
+    })
+
+    it('handles loggedIn case', async function() {
+      let loginSuccessful
+      const setLoggedIn = () => (loginSuccessful = true)
+      const setNotLoggedIn = () => (loginSuccessful = false)
+      confirmLoginLink.resolves(linkResults.loggedIn)
+      const el = /** @type {LoginForm} */ await fixture(
+        html`
+          <login-form
+            title="Login to Test"
+            @loginSuccessful=${setLoggedIn}
+            @loginFailed=${setNotLoggedIn}
+          ></login-form>
+        `
+      )
+      expect(loginSuccessful).to.be.true
+      expect(confirmLoginLink.called).to.be.true
+    })
+
+    it('handles missingEmail case', async function() {
+      let loginSuccessful
+      const setLoggedIn = () => (loginSuccessful = true)
+      const setNotLoggedIn = () => (loginSuccessful = false)
+      confirmLoginLink.resolves(linkResults.missingEmail)
+      const el = /** @type {LoginForm} */ await fixture(
+        html`
+          <login-form
+            title="Login to Test"
+            @loginSuccessful=${setLoggedIn}
+            @loginFailed=${setNotLoggedIn}
+          ></login-form>
+        `
+      )
+      expect(loginSuccessful).not.to.be.true
+      expect(confirmLoginLink.called).to.be.true
+      await elementUpdated(el)
+      expect(el.shadowRoot.querySelectorAll('#confirm-email').length).to.equal(1)
+    })
+
+    it('handles login failed', async function() {
+      let loginSuccessful
+      const setLoggedIn = () => (loginSuccessful = true)
+      const setNotLoggedIn = () => (loginSuccessful = false)
+      confirmLoginLink.resolves(linkResults.loginFailed)
+      const alert = sinon.stub(window, 'alert')
+      const el = /** @type {LoginForm} */ await fixture(
+        html`
+          <login-form
+            title="Login to Test"
+            @loginSuccessful=${setLoggedIn}
+            @loginFailed=${setNotLoggedIn}
+          ></login-form>
+        `
+      )
+      expect(loginSuccessful).not.to.be.true
+      expect(confirmLoginLink.called).to.be.true
+      await elementUpdated(el)
+      expect(alert.called).to.be.true
+    })
+  })
+
+  describe('getEmailForLinkMode', function() {
+    let confirmLoginLink
+    beforeEach(function() {
+      confirmLoginLink = sinon.stub(auth, 'confirmLoginLink')
+    })
+
+    afterEach(function() {
+      confirmLoginLink.restore()
+    })
+
+    it('handles loggedIn', async function() {
+      let loginSuccessful
+      const setLoggedIn = () => (loginSuccessful = true)
+      const setNotLoggedIn = () => (loginSuccessful = false)
+      confirmLoginLink.resolves(linkResults.loggedIn)
+      const el = /** @type {LoginForm} */ await fixture(
+        html`
+          <login-form
+            title="Login to Test"
+            @loginSuccessful=${setLoggedIn}
+            @loginFailed=${setNotLoggedIn}
+          ></login-form>
+        `
+      )
+      el._setMode(modes.getEmailForLink)
+      await elementUpdated(el)
+      el.shadowRoot.getElementById('confirm-email').value = 'test@example.com'
+      el.shadowRoot.getElementById('confirm-email-button').click()
+      expect(loginSuccessful).to.be.true
+      expect(confirmLoginLink.calledTwice).to.be.true
+    })
+
+    it('handles loginFailed', async function() {
+      let loginSuccessful
+      const setLoggedIn = () => (loginSuccessful = true)
+      const setNotLoggedIn = () => (loginSuccessful = false)
+      confirmLoginLink.resolves(linkResults.loginFailed)
+      const el = /** @type {LoginForm} */ await fixture(
+        html`
+          <login-form
+            title="Login to Test"
+            @loginSuccessful=${setLoggedIn}
+            @loginFailed=${setNotLoggedIn}
+          ></login-form>
+        `
+      )
+      el._setMode(modes.getEmailForLink)
+      await elementUpdated(el)
+      el.shadowRoot.getElementById('confirm-email').value = 'test@example.com'
+      el.shadowRoot.getElementById('confirm-email-button').click()
+      await elementUpdated(el)
+      expect(loginSuccessful).to.be.false
+      expect(confirmLoginLink.calledTwice).to.be.true
+      expect(el.shadowRoot.getElementById('error-message').style.display).to.equal('block')
+      expect(el.shadowRoot.getElementById('error-message').textContent).to.equal('Login Failed')
+    })
+
+    it('handles missingEmail', async function () {
+      let loginSuccessful
+      const setLoggedIn = () => (loginSuccessful = true)
+      const setNotLoggedIn = () => (loginSuccessful = false)
+      confirmLoginLink.resolves(linkResults.missingEmail)
+      const el = /** @type {LoginForm} */ await fixture(
+        html`
+          <login-form
+            title="Login to Test"
+            @loginSuccessful=${setLoggedIn}
+            @loginFailed=${setNotLoggedIn}
+          ></login-form>
+        `
+      )
+      el._setMode(modes.getEmailForLink)
+      await elementUpdated(el)
+      el.shadowRoot.getElementById('confirm-email').value = 'test@example.com'
+      el.shadowRoot.getElementById('confirm-email-button').click()
+      await elementUpdated(el)
+      expect(loginSuccessful).not.to.be.true
+      expect(confirmLoginLink.calledTwice).to.be.true
+      expect(el.shadowRoot.getElementById('error-message').style.display).to.equal('block')
+      expect(el.shadowRoot.getElementById('error-message').textContent).to.equal('Email is required')
+    })
+
+    it('intercepts call on empty email', async function () {
+      let loginSuccessful
+      const setLoggedIn = () => (loginSuccessful = true)
+      const setNotLoggedIn = () => (loginSuccessful = false)
+      confirmLoginLink.resolves(linkResults.missingEmail)
+      const el = /** @type {LoginForm} */ await fixture(
+        html`
+          <login-form
+            title="Login to Test"
+            @loginSuccessful=${setLoggedIn}
+            @loginFailed=${setNotLoggedIn}
+          ></login-form>
+        `
+      )
+      el._setMode(modes.getEmailForLink)
+      await elementUpdated(el)
+      el.shadowRoot.getElementById('confirm-email').value = ''
+      el.shadowRoot.getElementById('confirm-email-button').click()
+      await elementUpdated(el)
+      expect(loginSuccessful).not.to.be.true
+      expect(confirmLoginLink.calledTwice).not.to.be.true
+      expect(el.shadowRoot.getElementById('error-message').style.display).to.equal('block')
+      expect(el.shadowRoot.getElementById('error-message').textContent).to.equal('Email is required')
+    })
+
+    it('handles noSecret', async function () {
+      let loginSuccessful
+      const setLoggedIn = () => (loginSuccessful = true)
+      const setNotLoggedIn = () => (loginSuccessful = false)
+      confirmLoginLink.resolves(linkResults.noSecret)
+      const el = /** @type {LoginForm} */ await fixture(
+        html`
+          <login-form
+            title="Login to Test"
+            @loginSuccessful=${setLoggedIn}
+            @loginFailed=${setNotLoggedIn}
+          ></login-form>
+        `
+      )
+      el._setMode(modes.getEmailForLink)
+      await elementUpdated(el)
+      el.shadowRoot.getElementById('confirm-email').value = 'test@example.com'
+      el.shadowRoot.getElementById('confirm-email-button').click()
+      await elementUpdated(el)
+      expect(loginSuccessful).not.to.be.true
+      expect(confirmLoginLink.calledTwice).to.be.true
+      expect(el.shadowRoot.getElementById('error-message').style.display).to.equal('block')
+      expect(el.shadowRoot.getElementById('error-message').textContent).to.equal('Link is invalid')
+    })
+
+    it('defaults to error message', async function () {
+      let loginSuccessful
+      const setLoggedIn = () => (loginSuccessful = true)
+      const setNotLoggedIn = () => (loginSuccessful = false)
+      confirmLoginLink.resolves(Symbol())
+      const el = /** @type {LoginForm} */ await fixture(
+        html`
+          <login-form
+            title="Login to Test"
+            @loginSuccessful=${setLoggedIn}
+            @loginFailed=${setNotLoggedIn}
+          ></login-form>
+        `
+      )
+      el._setMode(modes.getEmailForLink)
+      await elementUpdated(el)
+      el.shadowRoot.getElementById('confirm-email').value = 'test@example.com'
+      el.shadowRoot.getElementById('confirm-email-button').click()
+      await elementUpdated(el)
+      expect(loginSuccessful).not.to.be.true
+      expect(confirmLoginLink.calledTwice).to.be.true
+      expect(el.shadowRoot.getElementById('error-message').style.display).to.equal('block')
+      expect(el.shadowRoot.getElementById('error-message').textContent).to.equal('Something has gone wrong')
+    })
+
+  })
+
   describe('shows temporary error messages', function() {
     it('shows error then hides it', async function() {
       const clock = sinon.useFakeTimers()
@@ -355,12 +598,18 @@ describe('LoginForm', function() {
       )
       el._setError('test message')
       await elementUpdated(el)
-      expect(el.shadowRoot.getElementById('error-message').textContent).to.equal('test message')
-      expect(el.shadowRoot.getElementById('error-message').style.display).to.equal('block')
+      expect(el.shadowRoot.getElementById('error-message').textContent).to.equal(
+        'test message'
+      )
+      expect(el.shadowRoot.getElementById('error-message').style.display).to.equal(
+        'block'
+      )
       clock.runAll()
       await elementUpdated(el)
       expect(el.shadowRoot.getElementById('error-message').textContent).to.equal('')
-      expect(el.shadowRoot.getElementById('error-message').style.display).to.equal('none')
+      expect(el.shadowRoot.getElementById('error-message').style.display).to.equal(
+        'none'
+      )
     })
   })
 })
