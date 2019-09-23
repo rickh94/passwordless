@@ -1,0 +1,62 @@
+version: '3'
+services:
+  mongo-test:
+    image: mongo
+    expose:
+      - 27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: "${DB_USERNAME}"
+      MONGO_INITDB_ROOT_PASSWORD: "${DB_PASSWORD}"
+
+  mongo-express:
+    image: mongo-express
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: "${DB_USERNAME}"
+      ME_CONFIG_MONGODB_ADMINPASSWORD: "${DB_PASSWORD}"
+      ME_CONFIG_MONGODB_SERVER: mongo-test
+    depends_on:
+      - mongo-test
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    ports:
+      - "8080:80"
+    environment:
+      - DB_USERNAME
+      - DB_HOST=mongo-test
+      - DB_PASSWORD
+      - DB_NAME
+      - DB_PORT=27017
+      - SECRET_KEY
+      - ACCESS_TOKEN_EXPIRE_MINUTES
+      - MAILGUN_KEY
+      - REDIS_HOST=redis-test
+      - REDIS_PORT=6379
+      - HOSTNAME
+      - MAILGUN_ENDPOINT=localhost
+      - MAILGUN_FROM_NAME
+      - MAILGUN_FROM_ADDRESS
+      - DEBUG=1
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      - mongo-test
+      - redis-test
+
+  redis-test:
+    image: redis:5.0.5-alpine
+    expose:
+      - 6379
+
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.7.0/24

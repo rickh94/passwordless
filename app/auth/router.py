@@ -5,11 +5,7 @@ import os
 import aiohttp
 from fastapi import APIRouter, Depends, Body, HTTPException, Form
 from starlette.responses import UJSONResponse
-from starlette.status import (
-    HTTP_401_UNAUTHORIZED,
-    HTTP_201_CREATED,
-    HTTP_400_BAD_REQUEST,
-)
+from starlette.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST
 
 from app.auth import models, security, crud
 from app.auth.security import oauth2_scheme
@@ -27,6 +23,22 @@ secure_cookies = not DEBUG
 logger = logging.getLogger()
 
 
+async def send_email(to: str, subject: str, text: str):
+    async with aiohttp.ClientSession() as session:
+        res = await session.post(
+            mailgun_enpoint,
+            auth=aiohttp.BasicAuth("api", mailgun_key),
+            data={
+                "from": f"{from_name} <{from_address}>",
+                "to": to,
+                "subject": subject,
+                "text": text,
+            },
+        )
+        if res.status != 200:
+            raise HTTPException(status_code=500, detail="Could not send email.")
+
+
 @auth_router.post("/request")
 async def request_login(data: models.AuthRequest = Body(...)):
     user = await crud.get_user_by_email(data.email)
@@ -35,19 +47,7 @@ async def request_login(data: models.AuthRequest = Body(...)):
             status_code=HTTP_400_BAD_REQUEST, detail="No user with that email."
         )
     otp = security.generate_otp(data.email)
-    async with aiohttp.ClientSession() as session:
-        res = await session.post(
-            mailgun_enpoint,
-            auth=aiohttp.BasicAuth("api", mailgun_key),
-            data={
-                "from": f"{from_name} <{from_address}>",
-                "to": data.email,
-                "subject": "Your One Time Password",
-                "text": f"Your password is {otp}",
-            },
-        )
-        if res.status != 200:
-            raise HTTPException(status_code=500, detail="Could not send email.")
+    await send_email(data.email, "Your One Time Password", f"Your password is {otp}")
     return "Please check your email for a single use password."
 
 
@@ -59,19 +59,11 @@ async def request_magic(data: models.AuthRequest = Body(...)):
             status_code=HTTP_400_BAD_REQUEST, detail="No user with that email."
         )
     magic_link = security.generate_magic_link(data.email)
-    async with aiohttp.ClientSession() as session:
-        res = await session.post(
-            mailgun_enpoint,
-            auth=aiohttp.BasicAuth("api", mailgun_key),
-            data={
-                "from": f"{from_name} <{from_address}>",
-                "to": data.email,
-                "subject": "Your magic sign in link",
-                "text": f"Click this link to sign in\n{magic_link}.",
-            },
-        )
-        if res.status != 200:
-            raise HTTPException(status_code=500, detail="Could not send email.")
+    await send_email(
+        data.email,
+        "Your magic sign in link",
+        f"Click this link to sign in\n{magic_link}",
+    )
     return "Please check your email for your sign in link."
 
 

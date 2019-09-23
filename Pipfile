@@ -5,6 +5,11 @@ verify_ssl = true
 
 [dev-packages]
 ipython = "*"
+pytest = "*"
+pymongo = "*"
+requests = "*"
+ptpython = "*"
+pytest-cov = "*"
 
 [packages]
 fastapi = {extras = ["full"],version = "*"}
