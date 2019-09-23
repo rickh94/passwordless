@@ -1,13 +1,9 @@
 import os
-from unittest import mock
-
-import pytest
-import redis
-from _pytest.monkeypatch import MonkeyPatch
-from starlette.testclient import TestClient
 import secrets
 
-from app.auth import models
+import pytest
+from _pytest.monkeypatch import MonkeyPatch
+from starlette.testclient import TestClient
 
 
 @pytest.fixture

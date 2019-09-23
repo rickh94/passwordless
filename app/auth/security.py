@@ -4,7 +4,6 @@ import os
 import secrets
 import string
 from typing import Union
-from urllib.parse import quote_plus
 
 import jwt
 import redis
