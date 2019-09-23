@@ -83,22 +83,6 @@ async def verify_magic(data: models.Magic = Body(...)):
     return response
 
 
-@auth_router.get("/magic")
-async def magic(secret: str, email: str = Form(...)):
-    user = await security.authenticate_user_magic(email, secret)
-    if not user:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Invalid Link")
-    access_token_expires = datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = security.create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
-    )
-    response = UJSONResponse({"status": "authenticated"})
-    response.set_cookie(
-        oauth2_scheme.token_name, access_token, httponly=True, secure=secure_cookies
-    )
-    return response
-
-
 @auth_router.post("/confirm")
 async def confirm_login(data: models.OTP = Body(...)):
     user = await security.authenticate_user(data.email, data.code)
@@ -136,7 +120,7 @@ async def register(user: models.User = Body(...)):
 
 @auth_router.get("/sign-out")
 async def sign_out(
-    current_user: models.User = Depends(security.get_current_active_user)
+    _current_user: models.User = Depends(security.get_current_active_user)
 ):
     response = UJSONResponse({"status": "signed out"})
     response.set_cookie(oauth2_scheme.token_name, "", httponly=True)
